@@ -1,0 +1,35 @@
+﻿@inject IScansService ScansService
+@implements IDisposable
+
+<div class="h-screen bg-indigo-500 w-52 shrink-0">
+    <a href="/" class="pt-2 pl-3 text-2xl font-semibold text-white">
+        BiopSee
+    </a>
+    <div class="flex flex-col items-center pt-2">
+        <NavLink href="/scan" ActiveClass="" class="px-2 py-1 font-semibold text-white bg-indigo-400 rounded-lg w-fit">
+            Scan</NavLink>
+    </div>
+    <div class="flex flex-col py-2 pl-1 space-y-2 font-semibold text-white">
+        @foreach (var scan in ScansService.AllScans())
+        {
+            <NavLink ActiveClass="!text-indigo-100" class="hover:text-indigo-200 active:text-indigo-300"
+                href=@($"/scan/{scan.Id}")>@scan.Name</NavLink>
+        }
+    </div>
+</div>
+
+@code {
+    public void Dispose()
+    {
+        ScansService.Changed -= ScansChanged;
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+            ScansService.Changed += ScansChanged;        
+    }
+
+    void ScansChanged() =>
+        InvokeAsync(StateHasChanged);
+}

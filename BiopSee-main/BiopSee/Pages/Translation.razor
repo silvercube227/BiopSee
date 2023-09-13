@@ -1,0 +1,16 @@
+@page "/translation"
+@inject ITranslationService TranslationService
+@using System.IO.Ports
+
+<div>@TranslationService.SerialPortName</div>
+
+<div>Available ports:</div>
+@foreach (var x in SerialPort.GetPortNames())
+{
+    <button @onclick="() => SetPortName(x)">Name: @x</button>
+}
+
+@code {
+    void SetPortName(string name) =>
+        TranslationService.SerialPortName = name;
+}

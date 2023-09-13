@@ -1,0 +1,20 @@
+﻿@inherits LayoutComponentBase
+
+<PageTitle>BiopSee</PageTitle>
+
+<div>
+    <div class="flex h-screen">
+        <NavMenu />
+        <!-- Scroll wrapper -->
+        <div class="flex flex-1 overflow-hidden">
+            <!-- Scrollable container -->
+            <div class="flex-1 overflow-y-scroll">
+                <main class="flex h-full">
+                    <article class="flex flex-col w-full h-full p-4">
+                        @Body
+                    </article>
+                </main>
+            </div>
+        </div>
+    </div>
+</div>

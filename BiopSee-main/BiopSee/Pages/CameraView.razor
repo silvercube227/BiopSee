@@ -1,0 +1,19 @@
+﻿@page "/camera"
+@inject IPictureService ScanningService
+<PageTitle>Camera</PageTitle>
+<h3>CameraView</h3>
+
+<button @onclick=OnClick>Take Picture</button>
+@if (imagePath is not null)
+{
+    <img src="@imagePath"/>
+}
+
+@code {
+    private string? imagePath;
+    private void OnClick()
+    {
+        var imageName = ScanningService.TakePicture();
+        imagePath = $"/api/images/{imageName}";
+    }
+}

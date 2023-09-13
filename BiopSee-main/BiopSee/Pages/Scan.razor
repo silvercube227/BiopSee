@@ -1,0 +1,477 @@
+﻿@page "/scan"
+@inject IScansService ScansService
+@inject IPictureService PictureService
+@inject ITranslationService TranslationService
+@inject IScanner Scanner
+@inject NavigationManager NavigationManager
+
+<h3 class="text-5xl">Scan</h3>
+<NavigationLock ConfirmExternalNavigation="true" />
+@switch (page)
+{
+    case 0:
+        @* Input name of scan *@
+        <div class="flex flex-col items-center justify-between h-full">
+            <div class="flex flex-col items-center space-y-12">
+                <div class="pt-24 text-4xl font-bold text-indigo-500">New Scan</div>
+                <div class="flex items-center px-3 py-1 space-x-1">
+                    <label for="name" class="font-semibold">Scan Name:</label>
+                    <input class="px-2 py-1 bg-gray-100 rounded-lg" id="name" @bind=name />
+                </div>
+            </div>
+            <button @onclick=Next
+                class="mb-[5%] self-end p-2 font-bold text-white rounded-lg mr-[20%] w-fit bg-emerald-400 hover:bg-emerald-500">Next</button>
+        </div>
+
+        break;
+    case 1:
+        @* Input configuration of scan *@
+        <div class="flex flex-col items-center justify-between h-full">
+            <div class="flex flex-col items-center">
+                <div class="pt-24 text-4xl font-bold text-indigo-500">Scan Settings</div>
+                <div class="mt-8 space-y-3">
+                    <div class="flex space-x-1">
+                        <label class="font-semibold" for="spacing">Spacing (mm):</label>
+                        <input class="px-2 py-1 bg-gray-100 rounded-lg" id="spacing" @bind=scanSpacing @bind:event="oninput"
+
+                    />
+                    @* @bind:after=UpdateParameters type="number"  *@
+                    </div>
+                    <div class="flex space-x-1">
+                        <label class="font-semibold" for="xcount">X Count:</label>
+                        <input class="px-2 py-1 bg-gray-100 rounded-lg" id="xcount" @bind=scanXCount @bind:event="oninput"
+                    />
+                    @* @bind:after=UpdateParameters type="number"  *@
+                    </div>
+                    <div class="flex space-x-1">
+                        <label class="font-semibold" for="ycount">Y Count:</label>
+                        <input class="px-2 py-1 bg-gray-100 rounded-lg" id="ycount" @bind=scanYCount @bind:event="oninput"
+                    />
+                    @* @bind:after=UpdateParameters type="number"  *@
+                    </div>
+                    <div class="flex flex-col items-center justify-center">
+                        <p>Scan points: @(scanXCount * scanYCount)</p>
+                        <p>Area: @Math.Round(InstructionSet.Area, 1) mm<sup>2</sup></p>
+                        <p>@Math.Round(InstructionSet.XWidth, 1) mm x @Math.Round(InstructionSet.YWidth, 1) mm</p>
+                    </div>
+                    <div>
+                        @foreach (var error in InstructionSet.Errors)
+                        {
+                            <div class="font-semibold text-rose-500">
+                                @error
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+            <div class="flex mb-[5%] w-full justify-between">
+                <button @onclick=Previous
+                    class="self-start p-2 font-bold text-white rounded-lg ml-[20%] w-fit bg-gray-400 hover:bg-gray-500">Back</button>
+                <button disabled="@(InstructionSet.Errors.Count > 0)" @onclick=Next
+                    class="self-end p-2 font-bold text-white rounded-lg mr-[20%] w-fit bg-emerald-400 hover:bg-emerald-500">Next</button>
+            </div>
+        </div>
+        break;
+    case 2:
+        @* Ensure nothing is obstructing the apparatus *@
+        <div class="flex flex-col items-center justify-between h-full">
+            <div class="flex flex-col items-center">
+                <div class="pt-24 text-4xl font-bold text-indigo-500">Ensure Scan Surface Is Clear</div>
+            </div>
+            <div class="mb-[5%] w-full flex flex-col items-center">
+                <p class="pt-12 text-xl font-bold">Camera apparatus will begin moving</p>
+                <div class="flex justify-between w-full">
+                    <button @onclick=Previous
+                        class="self-start p-2 font-bold text-white rounded-lg ml-[20%] w-fit bg-gray-400 hover:bg-gray-500">Back</button>
+                    <button @onclick=Cleared
+                        class="self-end p-2 font-bold text-white rounded-lg mr-[20%] w-fit bg-amber-400 hover:bg-amber-500">Surface
+                        Is Clear</button>
+                </div>
+            </div>
+        </div>
+        break;
+    case 3:
+        @* Place slide *@
+        <div class="flex flex-col items-center justify-between h-full">
+            <div class="flex flex-col items-center">
+                <div class="pt-24 text-4xl font-bold text-indigo-500">Secure Slide</div>
+            </div>
+            <div class="mb-[5%] w-full flex flex-col items-center">
+                <p class="pt-12 text-xl font-bold">Camera apparatus will begin moving</p>
+                <div class="flex justify-between w-full">
+                    <button @onclick=Previous
+                        class="self-start p-2 font-bold text-white rounded-lg ml-[20%] w-fit bg-gray-400 hover:bg-gray-500">Back</button>
+                    <button @onclick=SlideSet
+                        class="self-end p-2 font-bold text-white rounded-lg mr-[20%] w-fit bg-amber-400 hover:bg-amber-500">Slide
+                        Is Secure</button>
+                </div>
+            </div>
+        </div>
+
+        break;
+    case 4:
+        @* Find center *@
+        <div class="flex flex-col items-center justify-between h-full">
+            <div class="flex flex-col items-center">
+                <div class="py-4 text-4xl font-bold text-indigo-500">Align lines with center of sample</div>
+                <div class="flex">
+                    <div class="flex space-x-4 w-52">
+                        <div class="flex flex-col items-center space-y-1">
+                            <p class="font-semibold">0.1mm</p>
+                            <button @onclick=CalibrateUpPrecise
+                                class="w-16 p-1 text-gray-700 bg-gray-300 rounded-lg hover:bg-gray-400 active:bg-gray-500">Up</button>
+                            <button @onclick=CalibrateDownPrecise
+                                class="w-16 p-1 text-gray-700 bg-gray-300 rounded-lg hover:bg-gray-400 active:bg-gray-500">Down</button>
+                            <button @onclick=CalibrateLeftPrecise
+                                class="w-16 p-1 text-gray-700 bg-gray-300 rounded-lg hover:bg-gray-400 active:bg-gray-500">Left</button>
+                            <button @onclick=CalibrateRightPrecise
+                                class="w-16 p-1 text-gray-700 bg-gray-300 rounded-lg hover:bg-gray-400 active:bg-gray-500">Right</button>
+                        </div>
+                        <div class="flex flex-col items-center space-y-1">
+                            <p class="font-semibold">1mm</p>
+                            <button @onclick=CalibrateUp
+                                class="w-16 p-1 text-gray-700 bg-gray-300 rounded-lg hover:bg-gray-400 active:bg-gray-500">Up</button>
+                            <button @onclick=CalibrateDown
+                                class="w-16 p-1 text-gray-700 bg-gray-300 rounded-lg hover:bg-gray-400 active:bg-gray-500">Down</button>
+                            <button @onclick=CalibrateLeft
+                                class="w-16 p-1 text-gray-700 bg-gray-300 rounded-lg hover:bg-gray-400 active:bg-gray-500">Left</button>
+                            <button @onclick=CalibrateRight
+                                class="w-16 p-1 text-gray-700 bg-gray-300 rounded-lg hover:bg-gray-400 active:bg-gray-500">Right</button>
+                        </div>
+                        <div class="flex flex-col items-center space-y-1">
+                            <p class="font-semibold">Zoom</p>
+                            <button @onclick=ZoomIn
+                                class="w-16 p-1 text-gray-700 bg-gray-300 rounded-lg hover:bg-gray-400 active:bg-gray-500">In</button>
+                            <button @onclick=ZoomOut
+                                class="w-16 p-1 text-gray-700 bg-gray-300 rounded-lg hover:bg-gray-400 active:bg-gray-500">Out</button>
+                        </div>
+                    </div>
+                    <div class="px-12 grow-0 h-[50vh]">
+                        @if (imagePath is null)
+                        {
+                            <div>Image Loading</div>
+                        }
+                        else
+                        {
+                            <img class="object-scale-down h-full" src="@imagePath" />
+                        }
+                    </div>
+                </div>
+            </div>
+            <div class="flex mb-[5%] w-full justify-between">
+                <button @onclick=Previous
+                    class="self-start p-2 font-bold text-white rounded-lg ml-[20%] w-fit bg-gray-400 hover:bg-gray-500">Back</button>
+                <button @onclick=NextToDistanceSet
+                    class="self-end p-2 font-bold text-white rounded-lg mr-[20%] w-fit bg-emerald-400 hover:bg-emerald-500">Next</button>
+            </div>
+        </div>
+        break;
+    case 5:
+        <div class="flex flex-col items-center justify-between h-full">
+            <div class="flex flex-col items-center">
+                <div class="py-4 text-4xl font-bold text-indigo-500">Set distance to subject</div>
+                <div class="flex">
+                    <div class="flex space-x-4 w-52">
+                        <div class="flex flex-col items-center space-y-1">
+                            <p class="font-semibold">0.1mm</p>
+                            <button @onclick=ZoomInCalibratePrecise
+                                class="w-16 p-1 text-gray-700 bg-gray-300 rounded-lg hover:bg-gray-400 active:bg-gray-500">Closer</button>
+                            <button @onclick=ZoomOutCalibratePrecise
+                                class="w-16 p-1 text-gray-700 bg-gray-300 rounded-lg hover:bg-gray-400 active:bg-gray-500">Further</button>
+                        </div>
+                        <div class="flex flex-col items-center space-y-1">
+                            <p class="font-semibold">1mm</p>
+                            <button @onclick=ZoomInCalibrate
+                                class="w-16 p-1 text-gray-700 bg-gray-300 rounded-lg hover:bg-gray-400 active:bg-gray-500">Closer</button>
+                            <button @onclick=ZoomOutCalibrate
+                                class="w-16 p-1 text-gray-700 bg-gray-300 rounded-lg hover:bg-gray-400 active:bg-gray-500">Further</button>
+                        </div>
+                    </div>
+                    <div class="px-12 grow-0 h-[50vh]">
+                        @if (imagePathZoom is null)
+                        {
+                            <div>Image Loading</div>
+                        }
+                        else
+                        {
+                            <img class="object-scale-down h-full" src="@imagePathZoom" />
+                        }
+                    </div>
+                </div>
+            </div>
+            <div class="flex mb-[5%] w-full justify-between">
+                <button @onclick=Previous
+                    class="self-start p-2 font-bold text-white rounded-lg ml-[20%] w-fit bg-gray-400 hover:bg-gray-500">Back</button>
+                <button @onclick=Next
+                    class="self-end p-2 font-bold text-white rounded-lg mr-[20%] w-fit bg-emerald-400 hover:bg-emerald-500">Next</button>
+            </div>
+        </div>
+        break;
+    case 6:
+        @* Confirm *@
+
+        <div class="flex flex-col items-center justify-between h-full">
+            <div class="flex flex-col items-center">
+                <div class="py-4 text-4xl font-bold text-indigo-500">Confirm the following settings</div>
+                <div>
+                    <div class="flex flex-col items-center justify-center space-y-3 text-lg">
+                        <p><span class="font-semibold">Name:</span> @name</p>
+                        <p><span class="font-semibold">Spacing (mm):</span> @scanSpacing</p>
+                        <p><span class="font-semibold">X Count:</span> @scanXCount</p>
+                        <p><span class="font-semibold">Y Count:</span> @scanYCount</p>
+                        <p><span class="font-semibold">Scan points:</span> @(scanXCount * scanYCount)</p>
+                        <p><span class="font-semibold">Area:</span> @Math.Round(InstructionSet.Area, 1) mm<sup>2</sup></p>
+                        <p>@Math.Round(InstructionSet.XWidth, 1) mm x @Math.Round(InstructionSet.YWidth, 1) mm</p>
+                    </div>
+                </div>
+
+            </div>
+            <div class="flex mb-[5%] w-full justify-between">
+                <button @onclick=Previous
+                    class="self-start p-2 font-bold text-white rounded-lg ml-[20%] w-fit bg-gray-400 hover:bg-gray-500">Back</button>
+                <button @onclick=StartScanAsync
+                    class="self-end p-2 font-bold text-white rounded-lg mr-[20%] w-fit bg-rose-400 hover:bg-rose-500">Start
+                    Scan</button>
+            </div>
+        </div>
+        break;
+    case 7:
+        @* Scanning *@
+        @if (cancelled)
+        {
+            <div class="flex flex-col items-center justify-between h-full">
+                <div class="flex flex-col items-center">
+                    <div class="pt-32 text-4xl font-bold text-rose-500">Scan Cancelled</div>
+                </div>
+                <div class="flex mb-[5%] w-full justify-between">
+                    <button @onclick=Reconfigure
+                        class="self-start p-2 font-bold text-white rounded-lg ml-[20%] w-fit bg-gray-400 hover:bg-gray-500">Reconfigure</button>
+                    <button @onclick=StartScanAsync
+                        class="self-end p-2 font-bold text-white rounded-lg mr-[20%] w-fit bg-rose-400 hover:bg-rose-500">Restart Scan</button>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="flex flex-col items-center justify-between h-full">
+                <div class="flex flex-col items-center">
+                    <div class="pt-24 pb-12 text-4xl font-bold text-emerald-500">Scanning</div>
+                    <div class="flex flex-col items-center space-y-3 text-lg font-semibold">
+                        <p>Elapsed: @timeElapsed.ToString(@"hh\:mm\:ss")</p>
+                        <p>Projected: @timeProjected?.ToString(@"hh\:mm\:ss")</p>
+                        <p>Scans: @progressCompleted / @progressTotal</p>
+                        <p>Completion: @progressPercentage%</p>
+                    </div>
+                </div>
+                <div class="w-full flex px-[20%]">
+                    <button @onclick=Cancel class="mb-[5%] w-full p-2 font-bold text-white rounded-lg bg-rose-400 hover:bg-rose-500">Cancel</button>
+                </div>
+            </div>
+        }
+        break;
+    default:
+        <div>Error while retrieving page</div>
+        break;
+}
+
+@code {
+    double scanSpacing = 0.1;
+    int scanXCount = 20;
+    int scanYCount = 20;
+    bool cancelled;
+    int page;
+    int progressPercentage;
+    int progressTotal;
+    int progressCompleted;
+    TimeSpan timeElapsed;
+    TimeSpan? timeProjected;
+    double x = 100;
+    double y = 100;
+    double z = 50;
+    string? imagePath;
+    string? imagePathZoom;
+    string name = $"Scan {DateTime.Now:u}";
+    void UpdateParameters() => StateHasChanged();
+    void Next() =>
+    page++;
+    void Previous() =>
+    page--;
+    void Cleared()
+    {
+        TranslationService.ResetToOrigin();
+        Next();
+    }
+    void SlideSet()
+    {
+        Task.Run(async () =>
+        {
+            TranslationService.Move(x, y, z);
+            imagePath = "/api/images/" + PictureService.TakePicture(true);
+            await InvokeAsync(StateHasChanged);
+        });
+        Next();
+    }
+    void NextToDistanceSet()
+    {
+        Task.Run(async () =>
+        {
+            imagePathZoom = "/api/images/" + PictureService.TakePicture(false);
+            await InvokeAsync(StateHasChanged);
+        });
+        Next();
+    }
+    void Cancel() =>
+    cancellationTokenSource.Cancel();
+    CancellationTokenSource cancellationTokenSource = new();
+    void ReportProgress(ScanProgress prog)
+    {
+        progressPercentage = (int)prog.Percentage;
+        progressCompleted = prog.Completed;
+        progressTotal = prog.Total;
+        timeElapsed = prog.ElaspedTime;
+        timeProjected = prog.Projected;
+        InvokeAsync(StateHasChanged);
+    }
+    void Reconfigure()
+    {
+        cancelled = false;
+        cancellationTokenSource = new();
+        page = 0;
+    }
+    ScanInstructionSet InstructionSet => new()
+        {
+            Spacing = scanSpacing,
+            XCenter = x,
+            YCenter = y,
+            XCount = scanXCount,
+            YCount = scanYCount,
+            Z = z
+        };
+    async Task StartScanAsync()
+    {
+        cancelled = false;
+        page++;
+        await InvokeAsync(StateHasChanged);
+        await Task.Run(async () =>
+        {
+            try
+            {
+                var scan = Scanner.TakeScan(name, InstructionSet.Instructions(), x, y, z, new Progress<ScanProgress>(ReportProgress),
+    cancellationTokenSource.Token);
+                ScansService.CreateScan(scan);
+                NavigationManager.NavigateTo($"/scan/{scan.Id}");
+            }
+            catch (OperationCanceledException)
+            {
+                cancelled = true;
+                await InvokeAsync(StateHasChanged);
+            }
+        });
+    }
+    void CalibrateRight()
+    {
+        x += 1;
+        SetCalibration();
+    }
+
+    void CalibrateRightPrecise()
+    {
+        x += .1;
+        SetCalibration();
+    }
+
+    void CalibrateLeft()
+    {
+        x -= 1;
+        SetCalibration();
+    }
+
+    void CalibrateLeftPrecise()
+    {
+        x -= .1;
+        SetCalibration();
+    }
+
+    void CalibrateDown()
+    {
+        y += 1;
+        SetCalibration();
+    }
+
+    void CalibrateDownPrecise()
+    {
+        y += .1;
+        SetCalibration();
+    }
+
+    void CalibrateUp()
+    {
+        y -= 1;
+        TranslationService.Move(x, y);
+        SetCalibration();
+    }
+
+    void CalibrateUpPrecise()
+    {
+        y -= .1;
+        SetCalibration();
+    }
+
+    void ZoomIn()
+    {
+        z = Math.Round(z + 1, 1);
+        TranslationService.Move(z);
+        imagePath = "/api/images/" + PictureService.TakePicture(true);
+    }
+
+    void ZoomOut()
+    {
+        z = Math.Round(z - 1, 1);
+        TranslationService.Move(z);
+        imagePath = "/api/images/" + PictureService.TakePicture(true);
+    }
+    void ZoomInCalibrate()
+    {
+        z = Math.Round(z + 1, 1);
+        TranslationService.Move(z);
+        imagePathZoom = "/api/images/" + PictureService.TakePicture(true);
+    }
+
+    void ZoomOutCalibrate()
+    {
+        z = Math.Round(z - 1, 1);
+        TranslationService.Move(z);
+        imagePathZoom = "/api/images/" + PictureService.TakePicture(true);
+    }
+    void ZoomInCalibratePrecise()
+    {
+        z = Math.Round(z + .1, 1);
+        TranslationService.Move(z);
+        imagePathZoom = "/api/images/" + PictureService.TakePicture(true);
+    }
+
+    void ZoomOutCalibratePrecise()
+    {
+        z = Math.Round(z - .1, 1);
+        TranslationService.Move(z);
+        imagePathZoom = "/api/images/" + PictureService.TakePicture(true);
+    }
+
+    void SetCalibration()
+    {
+        x = Math.Round(x, 1);
+        y = Math.Round(y, 1);
+        TranslationService.Move(x, y);
+        imagePath = "/api/images/" + PictureService.TakePicture(true);
+    }
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            imagePath = "/api/images/" + PictureService.TakePicture(true);
+            imagePathZoom = "/api/images/" + PictureService.TakePicture();
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+}

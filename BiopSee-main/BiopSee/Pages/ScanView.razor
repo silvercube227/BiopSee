@@ -1,0 +1,133 @@
+﻿@page "/scan/{id:guid}"
+@inject IScansService ScansService
+@inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
+@inject IAnalysisService AnalysisService
+@implements IDisposable
+
+@if (!loaded)
+{
+    <h3>Loading</h3>
+}
+else if (scan is null)
+{
+    <h3>Scan not found</h3>
+}
+else
+{
+    <div class="flex flex-col items-center justify-between w-full h-full">
+        <div class="flex flex-col items-center w-full">
+            <h3 class="text-3xl">@scan.Name</h3>
+            <p class="pt-2">@scan.Creation</p>
+            <p class="pt-2">Images: @scan.Count</p>
+            <h3 class="pt-6 pb-2 text-2xl">Analysis</h3>
+            @if (analysisInProgress)
+            {
+                <div>Analysis in progress</div>
+            }
+            else
+            {
+                @if (scan.AnalysisResult is null)
+                {
+                    <div>Analysis has not been performed</div>
+                    <div class="flex py-2 space-x-1">
+                        <label class="" for="scan-type">Scan Type:</label>
+                        <select class="px-2 py-1 bg-gray-100 rounded-lg appearance-none form-select" id="scan-type" @bind=scanType>
+                            <option value="pancreatic-exocrine">Panceatic Cancer (Exocrine)</option>
+                        </select>
+                    </div>
+                    <button disabled="@(string.IsNullOrEmpty(scanType))" @onclick=StartAnalysisAsync
+                        class=@($"p-2 font-bold text-white rounded-lg w-fit {(string.IsNullOrEmpty(scanType) ? "bg-gray-200" : "bg-indigo-400 hover:bg-indigo-500")}")>Start Analysis</button>
+                }
+                else
+                {
+                    <div class="px-4 font-semibold">@scan.AnalysisResult</div>
+                    <div class="flex py-2 space-x-1">
+                            <label class="" for="scan-type">Scan Type:</label>
+                            <select class="px-2 py-1 bg-gray-100 rounded-lg appearance-none form-select" id="scan-type" @bind=scanType>
+                                <option value="pancreatic-exocrine">Panceatic Cancer (Exocrine)</option>
+                            </select>
+                        </div>
+                        <button disabled="@(string.IsNullOrEmpty(scanType))" @onclick=StartAnalysisAsync
+                            class=@($"p-2 font-bold text-white rounded-lg w-fit {(string.IsNullOrEmpty(scanType) ? "bg-gray-200" : "bg-indigo-400 hover:bg-indigo-500")}")>Start New Analysis</button>
+                }
+            }
+            <h3 class="pt-6 pb-2 text-2xl">Images</h3>
+            <div>
+                <div class="flex flex-wrap w-full gap-1/2">
+                    @for (var i = 0; i < scan.Count; i++)
+                    {
+                        <div class="inline-block w-56 m-1">
+                            @{
+                                var i2 = i;
+                            }
+                            <p>@scan.ScanLocations[i2]</p>
+                            <img src="api/images/@scan.Images[i2]" />
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+        <div class="flex pb-[2%] w-full justify-center">
+            <button @onclick=DeleteAsync
+                class="p-2 font-bold text-white rounded-lg w-fit bg-rose-400 hover:bg-rose-500">Delete</button>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+    bool loaded;
+    Models.Scan? scan;
+    string scanType = "";
+    bool analysisInProgress;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            scan = ScansService.ReadScan(Id);
+            loaded = true;
+            NavigationManager.LocationChanged += OnNavigate;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    async Task StartAnalysisAsync()
+    {
+        if (scan is null)
+            return;
+        analysisInProgress = true;
+        await InvokeAsync(StateHasChanged);
+        _ = Task.Run(async () =>
+        {
+            var result = await AnalysisService.AnalyzeAsync(scan, scanType);
+            scan = scan with {AnalysisResult = result};
+            ScansService.UpdateScan(scan);
+            analysisInProgress = false;
+            await InvokeAsync(StateHasChanged);
+        });
+    }
+
+    async Task DeleteAsync()
+    {
+        var expected = Random.Shared.Next(1000, 9000).ToString();
+        if (await JSRuntime.InvokeAsync<string>("prompt", $"Enter \"{expected}\" to confirm deletion") == expected)
+        {
+            ScansService.DeleteScan(Id);
+            NavigationManager.NavigateTo("/");
+        }
+    }
+
+    void OnNavigate(object? sender, EventArgs ea)
+    {
+        scan = ScansService.ReadScan(Id);
+        loaded = true;
+        analysisInProgress = false;
+        scanType = "";
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose() =>
+        NavigationManager.LocationChanged -= OnNavigate;
+}

@@ -1,0 +1,18 @@
+@page "/prune"
+@inject IPictureService PictureService
+@inject IScansService ScansService
+
+<button @onclick=PruneImages class="p-2 font-semibold text-white bg-rose-400 hover:bg-rose:500 active:bg-rose-600">
+    Prune
+</button>
+
+@code {
+    void PruneImages()
+    {
+        HashSet<string> keep = new();
+        foreach (var scan in ScansService.AllScans())
+            foreach (var image in scan.Images)
+                keep.Add(image);
+        PictureService.Prune(keep);
+    }
+}
